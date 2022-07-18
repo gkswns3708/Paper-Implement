@@ -1,5 +1,9 @@
 # GoogleNet_Implement
 
+## Dataset
+Animals - 10 [Link](https://www.kaggle.com/datasets/alessiocorrado99/animals10)
+
+
 ## Layers
 ### ConvBlock
 ```

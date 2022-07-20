@@ -47,7 +47,7 @@ class InceptionModule(nn.Module):
         out = torch.cat([out1, out2, out3, out4], dim=1)
         return out 
 ```
-![GoogleNet InceptionModule](https://github.com/gkswns3708/Paper-Implement/blob/main/GoogleNet_Implment/images/Inception%20Module.png)
+![GoogleNet InceptionModule](images/Inception%20Module.png)
 
 ### AuxClassifier
 ```
@@ -172,4 +172,4 @@ class GoogleNet(nn.Module):
     def val_mode(self, Training=True):
         self.training = Training
 ```
-![GoogleNet Architecture](https://github.com/gkswns3708/Paper-Implement/blob/main/GoogleNet_Implment/images/Model%20Architecture.png)
+![GoogleNet Architecture](images/Model%20Architecture.png)

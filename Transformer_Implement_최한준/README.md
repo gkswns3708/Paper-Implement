@@ -118,7 +118,7 @@ Transformer의 Embedding은 `Input Embedding`과 `Positional Embedding` 두 가�
 - Positional Encoding 예시
     - 1. Simple Indexing
         
-        ![Untitled](Images/Untitled.png)
+        ![Untitled](images/Untitled.png)
         
         앞서 언급한 것처럼  가장 간단한 것은 Indexing일 겁니다. 하지만 Sequence의 길이가 길어지면 그에 따라 인덱스도 커지기 때문에, gradient explode와 같은 현상이 Training을 매우 불안정하게 만듭니다.
         

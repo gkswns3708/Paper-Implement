@@ -9,13 +9,15 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel
 
-from vocab import load_vocab
+from Data.vocab import load_vocab
 import config as cfg
 import model as bert
 import data
 import optimization as optim
 
-
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # TODO : Making Vocab Process
 """ random seed """
@@ -67,6 +69,7 @@ def train_model(rank, world_size, args):
     """
     master = (world_size == 0 or rank % world_size == 0)
     
+    
     vocab = load_vocab(args.vocab) # 학습시킨 Vocab Loading
     
     config = cfg.Config.load(args.config)
@@ -76,9 +79,9 @@ def train_model(rank, world_size, args):
     
     best_epoch, best_loss = 0, 0
     model = bert.BERTPretrain(config)
-    if os.path.isfile(args.save):
-        best_epoch, best_loss = model.bert.load(args.save)
-        print(f"rank : {rank} load pretrain from : {args.save}, epoch={best_epoch}, loss={best_loss}")
+    if os.path.isfile(args.save_path):
+        best_epoch, best_loss = model.bert.load(args.save_path)
+        print(f"rank : {rank} load pretrain from : {args.save_path}, epoch={best_epoch}, loss={best_loss}")
         best_epoch += 1
     if 1 < args.n_gpu:
         model.to(config.device)
@@ -120,10 +123,10 @@ def train_model(rank, world_size, args):
         if master:
             best_epoch, best_loss = epoch, loss
             if isinstance(model, DistributedDataParallel):
-                model.module.bert.save(best_epoch, best_loss, args.save)
+                model.module.bert.save(best_epoch, best_loss, args.save_path)
             else:
-                model.bert.save(best_epoch, best_loss, args.save)
-            print(f">>>> rank: {rank} save model to {args.save}, epoch={best_epoch}, loss={best_loss:.3f}")
+                model.bert.save(best_epoch, best_loss, args.save_path)
+            print(f">>>> rank: {rank} save model to {args.save_path}, epoch={best_epoch}, loss={best_loss:.3f}")
     
     print(f">>>> rank: {rank} losses: {losses}")
     
@@ -137,23 +140,36 @@ def train_model(rank, world_size, args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.json", type=str, required=False, help="Config File Path")
-    parser.add_argument("--vocab", default="./Data/kowiki.vocab", type=str, required=False, help="Vocab File Path")
+    parser.add_argument("--vocab", default="./Data/kowiki.model", type=str, required=False, help="Vocab File Path")
     parser.add_argument("--input", default="./Data/kowiki_bert_{}.json", type=str, required=False, help="Input File for Pretrain's Path")
+    parser.add_argument("--practice", default=0, type=int, required=False, help="Practice Mode")
     parser.add_argument("--count", default=10, type=int, required=False, help="Count of Pretrain File")
-    parser.add_argument("--save_path", default="save_pretrain.pth", type=str, required=False, help="Config File Path")
+    parser.add_argument("--save_path", default="./save/save_pretrain.pth", type=str, required=False, help="Config File Path")
     parser.add_argument("--epoch", default=20, type=int, required=False, help="Epoch")
     parser.add_argument("--batch", default=256, type=int, required=False, help="Batch Size")
+    parser.add_argument("--gpu", default=None, type=int, required=False, help="GPU id to use.")
     parser.add_argument('--seed', type=int, default=42, required=False, help="Random seed for Initialization")
     parser.add_argument("--weight_decay", default=0, type=float, required=False, help="Weight Decay") # TODO: Weight Decay 개념 및 Defalut BERT Weight Decay 공부. 아래의 것들도 마찬가지
     parser.add_argument('--learning_rate', type=float, default=5e-5, required=False, help="Learning Rate")
     parser.add_argument('--adam_epsilon', type=float, default=1e-8, required=False, help="Adam Epsilon")
     parser.add_argument('--warmup_steps', type=float, default=0, required=False, help="Warmup Steps")
     
+    
+    
+    args = parser.parse_args()
+    
+    if args.practice:
+        args.input = "./Data/kowiki_practice_bert_{}.json"
+        
     args = parser.parse_args()
     
     # TODO: n_gpu와 args.gpu를 구분해야함.
     
-    args.n_gpu = 0
+    
+    args.n_gpu =  0
+    args.gpu = 0
+    print(args.gpu)
+    print(args.n_gpu)
     set_seed(args)
     
-    train_model(0 if args.gpu is None else args.gpu, args.n_gpu, args)
+    train_model(0, args.n_gpu, args)

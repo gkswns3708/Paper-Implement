@@ -13,8 +13,9 @@ def get_attn_pad_mask(seq_q, seq_k, i_pad):
 
 class ScaledDotProductAttention(nn.Module):
     def __init__(self, config):
+        super().__init__()
         self.config = config
-        self.dropout = nn.Dropout(config.dropout)
+        self.dropout = nn.Dropout(p=config.dropout)
         self.scale = 1 / (self.config.d_hidn ** 0.5)
         
     def forward(self, Q, K, V, attn_mask):
@@ -26,7 +27,7 @@ class ScaledDotProductAttention(nn.Module):
         
         # attn_prob shape : (bs, n_head, n_q_seq, n_k_seq)
         attn_prob = nn.Softmax(dim=-1)(scores)
-        attn_prob = self.dropout(self.config.dropout)
+        attn_prob = self.dropout(attn_prob)
         
         # context shape : (bs, n_head, n_q_seq, d_embedding)
         context = torch.matmul(attn_prob, V)
@@ -127,7 +128,7 @@ class Encoder(nn.Module):
         self.config = config
         
         self.enc_emb = nn.Embedding(self.config.n_enc_vocab, self.config.d_hidn)
-        self.pos_emb = nn.Embedding(self.config.n_enc_seq + 1, self.config.d_hidn) # [CLS] 토큰 때문에 + 1
+        self.pos_emb = nn.Embedding(self.config.n_enc_seq + 1, self.config.d_hidn)
         self.seg_emb = nn.Embedding(self.config.n_seg_type, self.config.d_hidn)
         
         self.layers = nn.ModuleList([EncoderLayer(self.config) for _ in range(self.config.n_layer)])
@@ -135,10 +136,10 @@ class Encoder(nn.Module):
     def forward(self, inputs, segments):
         positions = torch.arange(inputs.size(1), device=inputs.device, dtype=inputs.dtype).expand(inputs.size(0), inputs.size(1)).contiguous() + 1
         pos_mask = inputs.eq(self.config.i_pad)
-        positions.mask_fill_(pos_mask, 0)
+        positions.masked_fill_(pos_mask, 0)
         
         # outputs shape : (bs, n_enc_seq, d_hidn)
-        outputs = self.enc_emb(inputs) + self.pos_emb(inputs) + self.seg_emb(inputs)
+        outputs = self.enc_emb(inputs) + self.pos_emb(positions) + self.seg_emb(segments)
         
         # attn_mask shape : (bs, n_enc_seq, n_enc_seq)
         # get_attn_pad_mask : (input sequence + pad) * (input sequence + pad)로 된 matrix에서 padding부분의 attention을 지움.

@@ -18,7 +18,9 @@ class ScaledDotProductAttention(nn.Module):
         self.scale = 1 / (self.config.d_hidn ** 0.5)
         
     def forward(self, Q, K, V, attn_mask):
-        # scores shape : (bs, n_head,n_q_seq, n_k_seq) n_q_seq와 n_k_seq는 같은 값.
+        # Q, K, V에 들어가는 갯수는 
+        # Q, K, V shape : (bs, d_head, n_{}_seq, d_hidn)
+        # scores shape : (bs, n_head, n_q_seq, n_k_seq) n_q_seq와 n_k_seq는 같은 값.
         scores = torch.matmul(Q, K.transpose(-1, -2)).mul_(self.scale)
         scores.masked_fill_(attn_mask, -1e9)
         
@@ -29,6 +31,7 @@ class ScaledDotProductAttention(nn.Module):
         # context shape : (bs, n_head, n_q_seq, d_embedding)
         context = torch.matmul(attn_prob, V)
         
+        # attn_prob shape : (bs, n_head, n_q_seq, n_k_seq)
         return context, attn_prob
         
         
@@ -38,6 +41,7 @@ class MultiHeadAttention(nn.Module):
         super().__init__()
         self.config = config
         
+
         self.W_Q = nn.Linear(self.config.d_hidn, self.config.n_head * self.config.d_head)
         self.W_K = nn.Linear(self.config.d_hidn, self.config.n_head * self.config.d_head)
         self.W_V = nn.Linear(self.config.d_hidn, self.config.n_head * self.config.d_head)
@@ -66,6 +70,8 @@ class MultiHeadAttention(nn.Module):
         output = self.linear(context)
         output = self.dropout(output)
         
+        # output shape : (bs, n_q_neq, d_hidn)
+        # attn_prob : (bs, n_head, n_q_seq, n_k_seq)
         return output, attn_prob
         
     
@@ -102,6 +108,7 @@ class EncoderLayer(nn.Module):
         self.layer_norm2 = nn.LayerNorm(self.config.d_hidn, eps=self.config.layer_norm_epsilon)
     
     def forward(self, inputs, attn_mask):
+        # inputs
         # attn_outputs shape : (bs, n_enc_seq, d_hidn)
         # attn_prob shape : (bs, n_head, n_enc_seq, n_enc_seq)
         att_outputs, attn_prob = self.self_attn(inputs, inputs, inputs, attn_mask)
@@ -141,9 +148,10 @@ class Encoder(nn.Module):
         for layer in self.layers:
             # outputs shape : (bs, n_enc_seq, d_hidn)
             # attn_mask shape : (bs, n_enc_seq, n_enc_seq)
+            # attn_prob shape : (bs, n_layers, n_enc_seq, n_enc_seq)
             outputs, attn_prob = layer(outputs, attn_mask)
             attn_probs.append(attn_prob)
-        
+        # attn_probs shape : n_layers * (bs, n_layers, n_enc_seq, n_enc_seq)
         return outputs, attn_probs
         
         
@@ -160,15 +168,29 @@ class BERT(nn.Module):
         self.activation = torch.tanh 
         
     def forward(self, inputs, segments):
-        # output.shape : (bs, n_seq, d_hidn)
-        # self_attn_probs.shape : (bs, n_head, n_enc_seq, n_enc_seq)
+        # outputs shape : (bs, n_seq, d_hidn)
+        # self_attn_probs shape : (bs, n_head, n_enc_seq, n_enc_seq)
         outputs, self_attn_probs = self.encoder(inputs, segments)
         
+        # outputs_cls shape : (bs, 1, n_seq) -> Contiguou
         outputs_cls = outputs[:, 0].contiguous() 
         outputs_cls = self.linear(outputs_cls)
         outputs_cls = self.activation(outputs_cls)
         
+        # outputs shape : (bs, n_enc_seq, n_enc_vocab)
         return outputs, outputs_cls, self_attn_probs
+
+    def save(self, epoch, loss, path):
+        torch.save({
+            "epoch" : epoch,
+            "loss" : loss,
+            "state_dict" : self.state_dict()
+        }, path)
+    
+    def load(self, path):
+        save = torch.load(path)
+        self.load_state_dict(save["state_dict"])
+        return save["epoch"], save["loss"]
         
         
         
@@ -180,3 +202,24 @@ class BERTPretrain(nn.Module):
         self.config = config
         
         self.bert = BERT(self.config)
+        # classifier for NSP
+        self.projection_cls = nn.Linear(self.config.d_hidn, 2, bias=False)
+        # classifier for LM(Masked Word prediction)
+        self.projection_lm = nn.Linear(self.config.d_hidn, self.config.n_enc_vocab, bias=False)
+        self.projection_lm.weight = self.bert.encoder.enc_emb.weight
+        
+    def forward(self, inputs, segments):
+        # outputs shape : (bs, n_enc_seq, d_hidn)
+        # outputs_cls shape : (bs, d_hidn)
+        # attn_probs shape : n_layers * [(bs, n_layers, n_enc_seq, n_enc_seq)]
+        outputs, outputs_cls, attn_probs = self.bert(inputs, segments)
+        # logits_cls shape : (bs, 2)
+        logits_cls = self.projection_cls(outputs_cls)
+        # logits_lm shape : (bs, n_enc_seq, n_enc_voab)
+        logits_lm = self.projection_lm(outputs)
+        
+        # logits_cls shape : (bs, 2)
+        # logits_lm shape : (bs, n_enc_seq, n_enc_voab)
+        # attn_probs shape : n_layers * [(bs, n_layers, n_enc_seq, n_enc_seq)]
+        return logits_cls, logits_lm, attn_probs
+        

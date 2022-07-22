@@ -30,29 +30,27 @@ def set_seed(args):
 def train_epoch(config, rank, epoch, model, criterion_lm, criterion_cls, optimizer, scheduler, train_loader):
     losses = []
     model.train()
-    
+
     with tqdm(total=len(train_loader), desc=f"Train({rank}) {epoch}") as pbar:
-        for i , value in enumerate(train_loader):
-            labels_cls, labels_lm, inputs, segments = map(lambda v : v.to(config.device), value)
-            
+        for i, value in enumerate(train_loader):
+            labels_cls, labels_lm, inputs, segments = map(lambda v: v.type(torch.LongTensor).to(config.device), value)
             optimizer.zero_grad()
             outputs = model(inputs, segments)
             logits_cls, logits_lm = outputs[0], outputs[1]
-            
+
             loss_cls = criterion_cls(logits_cls, labels_cls)
-            loss_lm = criterion_lm(logits_lm.view(-1, logits_lm.size(2)), labels_lm.view(-1)) # TODO 왜 처리를 이렇게 했는지 논리적으로 공부
+            loss_lm = criterion_lm(logits_lm.view(-1, logits_lm.size(2)), labels_lm.view(-1))
             loss = loss_cls + loss_lm
-            
-            # validation을 위한 loss는 Mask Prediction Task를 수행하고 나온 Loss를 이용하는 듯 함.
+
             loss_val = loss_lm.item()
             losses.append(loss_val)
-            
+
             loss.backward()
             optimizer.step()
             scheduler.step()
-            
+
             pbar.update(1)
-            pbar.set_postfix_str(f"Loss : {loss_val:.3f} ({np.mean(losses):.3f})")
+            pbar.set_postfix_str(f"Loss: {loss_val:.3f} ({np.mean(losses):.3f})")
     return np.mean(losses)
 
 """ destroy_process_group """
@@ -146,7 +144,7 @@ if __name__ == "__main__":
     parser.add_argument("--count", default=10, type=int, required=False, help="Count of Pretrain File")
     parser.add_argument("--save_path", default="./save/save_pretrain.pth", type=str, required=False, help="Config File Path")
     parser.add_argument("--epoch", default=20, type=int, required=False, help="Epoch")
-    parser.add_argument("--batch", default=256, type=int, required=False, help="Batch Size")
+    parser.add_argument("--batch", default=16, type=int, required=False, help="Batch Size")
     parser.add_argument("--gpu", default=None, type=int, required=False, help="GPU id to use.")
     parser.add_argument('--seed', type=int, default=42, required=False, help="Random seed for Initialization")
     parser.add_argument("--weight_decay", default=0, type=float, required=False, help="Weight Decay") # TODO: Weight Decay 개념 및 Defalut BERT Weight Decay 공부. 아래의 것들도 마찬가지
@@ -157,19 +155,13 @@ if __name__ == "__main__":
     
     
     args = parser.parse_args()
-    
-    if args.practice:
-        args.input = "./Data/kowiki_practice_bert_{}.json"
         
     args = parser.parse_args()
     
     # TODO: n_gpu와 args.gpu를 구분해야함.
     
-    
     args.n_gpu =  0
     args.gpu = 0
-    print(args.gpu)
-    print(args.n_gpu)
     set_seed(args)
     
     train_model(0, args.n_gpu, args)

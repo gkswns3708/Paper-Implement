@@ -186,9 +186,9 @@ class PretrainDataSet(torch.utils.data.Dataset):
                 sentences = [vocab.piece_to_id(p) for p in instance["tokens"]]
                 self.sentences.append(sentences)
                 self.segments.append(instance["segment"])
-                mask_idx = np.array(instance["mask_idx"], dtype=np.int)
-                mask_label = np.array([vocab.piece_to_id(p) for p in instance["mask_label"]], dtype=np.int)
-                label_lm = np.full(len(sentences), dtype=np.int, fill_value=-1)
+                mask_idx = np.array(instance["mask_idx"], dtype=np.int32)
+                mask_label = np.array([vocab.piece_to_id(p) for p in instance["mask_label"]], dtype=np.int32)
+                label_lm = np.full(len(sentences), dtype=np.int32, fill_value=-1)
                 label_lm[mask_idx] = mask_label
                 self.labels_lm.append(label_lm)
     
@@ -299,7 +299,7 @@ if __name__ == '__main__':
     parser.add_argument("--output", default="./Data/kowiki_bert_{}.json", type=str, required=False, help="output json file")
     parser.add_argument("--count", default=10, type=int, required=False, help="count of pretrain data")
     parser.add_argument("--n_seq", default=256, type=int, required=False, help="sequence length")
-    parser.add_argument("--vocab", default="./data/kowiki.model", type=str, required=False, help="vocab file")
+    parser.add_argument("--vocab", default="./Data/kowiki.model", type=str, required=False, help="vocab file")
     parser.add_argument("--mask_prob", default=0.15, type=float, required=False, help="probility of mask")
     parser.add_argument("--practice", default=0, type=int, required=False, help="Practice Mode")
     args = parser.parse_args()

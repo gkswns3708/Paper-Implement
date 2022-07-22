@@ -74,10 +74,6 @@ class MultiHeadAttention(nn.Module):
         # output shape : (bs, n_q_neq, d_hidn)
         # attn_prob : (bs, n_head, n_q_seq, n_k_seq)
         return output, attn_prob
-        
-    
-        
-
 
 class PoswiseFeedForwardNet(nn.Module):
     def __init__(self, config):
@@ -112,7 +108,7 @@ class EncoderLayer(nn.Module):
         # inputs
         # attn_outputs shape : (bs, n_enc_seq, d_hidn)
         # attn_prob shape : (bs, n_head, n_enc_seq, n_enc_seq)
-        att_outputs, attn_prob = self.self_attn(inputs, inputs, inputs, attn_mask)
+        attn_outputs, attn_prob = self.self_attn(inputs, inputs, inputs, attn_mask)
         attn_outputs = self.layer_norm1(inputs + attn_outputs) # Residual Connection
         
         # ffn_outputs shape : (bs, n_enc_seq, d_hidn)
@@ -223,4 +219,39 @@ class BERTPretrain(nn.Module):
         # logits_lm shape : (bs, n_enc_seq, n_enc_voab)
         # attn_probs shape : n_layers * [(bs, n_layers, n_enc_seq, n_enc_seq)]
         return logits_cls, logits_lm, attn_probs
+    
+class MovieClassification(nn.Module):
+    def __init__(self, config):
+        self.config = config
+        
+        self.bert = BERT(self.config)
+        # classifier 
+        self.projection_cls = nn.Linear(self.config.d_hidn, self.config.n_output, bias=False)
+        
+    def forward(self, inputs, segments):
+        # outputs shape : (bs, n_enc_seq, d_hidn)
+        # outputs_cls shape : (bs, d_hidn)
+        # attn_prob = n_layer * [bs, n_head, n_enc_seq, n_enc_seq]
+        outputs, outputs_cls, attn_prob = self.bert(inputs, segments)
+        
+        # logits_cls shape : (bs, n_output)
+        logits_cls = self.projection_cls(outputs_cls)
+        
+        # logits_cls shape : (bs, n_output)
+        # attn_prob = n_layer * [bs, n_head, n_enc_seq, n_enc_seq]
+        return logits_cls, attn_prob 
+    
+    def save(self, epoch, loss, score, path):
+        torch.save({
+            "epoch" : epoch,
+            "loss" : loss,
+            "score" : score,
+            "state_dict" : self.state_dict()
+        }, path)
+    
+    def load(self, path):
+        save = torch.load(path)
+        self.load_state_dict(save["state_dict"])
+        return save["epoch"], save["loss"], save["score"]
+        
         

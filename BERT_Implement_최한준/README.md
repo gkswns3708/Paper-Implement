@@ -44,6 +44,12 @@ $ python pretrain.py     # Large Corpus를 이용한 Pre-trainin을 실행함.
 $ python train.py        # Fine-tuning Task를 수행함(네이버 영화 댓글 데이터를 이용한 Sentence Binary Classification)
 ```
 # Requirements
+https://drive.google.com/drive/folders/1lf8t9jE5LcFpg2UeMTPrD_rjjJQiC8oq?usp=sharing
+
+위 링크에서 Vocab을 형성할 때 필요한 Pre-trained Model, Vocab, Raw Data들이 있습니다. 
+
+해당 코드에 관한 Reference는 https://paul-hyun.github.io/vocab-with-sentencepiece/ 에 있습니다.
+
 ```
 black==22.6.0
 blessings==1.7
